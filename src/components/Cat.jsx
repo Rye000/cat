@@ -560,7 +560,7 @@ const CatDietApp = () => {
                                                 setNewCustomKcal(val === "" ? "" : Number(val));
                                             }
                                         }}
-                                        className="w-20 p-2 text-sm bg-white border border-gray-200 rounded focus:outline-none focus:border-purple-300"
+                                        className="w-full p-2 text-sm bg-white border border-gray-200 rounded focus:outline-none focus:border-purple-300"
                                     />
                                 </div>
                                 <div className="flex gap-2">
