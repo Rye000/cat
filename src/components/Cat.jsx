@@ -165,6 +165,7 @@ const CatDietApp = () => {
   // 如果是本地開發可以使用 process.env 或 import.meta.env，但在這裡我們使用變數
   const CSV_API_URL = import.meta.env.VITE_API_KEY;
 
+
   // === Effect: 取得體重數據 ===
   useEffect(() => {
     const fetchWeightData = async () => {
