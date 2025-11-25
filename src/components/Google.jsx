@@ -41,11 +41,35 @@ const CatWeightRecorder = ({ onUploadSuccess }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // 1. 第一步：先跳出 SweetAlert 讓你輸入驗證碼
+        const { value: userKey } = await Swal.fire({
+            title: "身份驗證",
+            text: "請輸入通關密語才能上傳",
+            input: "password", // 使用 password 類型，輸入時會變成圓點點 (或是改用 'text' 也可以)
+            inputLabel: "驗證 Key",
+            inputPlaceholder: "請輸入 Key...",
+            showCancelButton: true,
+            confirmButtonText: "送出",
+            cancelButtonText: "取消",
+            confirmButtonColor: "#3085d6",
+            cancelButtonColor: "#d33",
+            inputValidator: (value) => {
+                if (!value) {
+                    return "請輸入驗證碼！";
+                }
+            },
+        });
+
+        // 如果使用者按了取消，userKey 會是 undefined，直接結束函式
+        if (!userKey) return;
+
+        // 2. 使用者輸入了 Key，開始 loading 流程
         setLoading(true);
 
         Swal.fire({
             title: "資料上傳中...",
-            text: "正在將貓貓體重寫入試算表",
+            text: "正在驗證並寫入...",
             allowOutsideClick: false,
             didOpen: () => {
                 Swal.showLoading();
@@ -53,9 +77,15 @@ const CatWeightRecorder = ({ onUploadSuccess }) => {
         });
 
         try {
+            // 建構 payload，把剛剛輸入的 userKey 放進去
+            const payload = {
+                ...formData,
+                apiKey: userKey, // 這裡使用手動輸入的值
+            };
+
             const response = await fetch(GAS_URL, {
                 method: "POST",
-                body: JSON.stringify(formData),
+                body: JSON.stringify(payload),
             });
 
             const data = await response.json();
@@ -75,10 +105,11 @@ const CatWeightRecorder = ({ onUploadSuccess }) => {
                     },
                 });
             } else {
+                // 如果 GAS 回傳 error (通常是 Key 錯了)
                 Swal.fire({
                     icon: "error",
-                    title: "寫入失敗",
-                    text: data.message || "未知錯誤",
+                    title: "上傳失敗",
+                    text: data.message, // 這裡會顯示 GAS 回傳的 "權限不足：驗證碼錯誤"
                 });
             }
         } catch (error) {
