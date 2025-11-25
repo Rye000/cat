@@ -946,6 +946,7 @@ const CatDietApp = () => {
         {/* === 分頁 3: 體重趨勢圖 (整合真實數據與篩選) === */}
         {activeTab === "weight" && (
           <div className="space-y-4 animate-fade-in">
+            
             {/* 篩選器控制列 */}
             <div className="bg-white rounded-xl shadow-sm p-3 border border-gray-100 flex gap-2 overflow-x-auto">
               <div className="flex items-center gap-2 min-w-fit px-2 border-r border-gray-100">
