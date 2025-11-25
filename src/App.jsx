@@ -1,12 +1,12 @@
 import "./App.css";
 import CatDietCalculator from "./components/Cat";
-import Test from "./components/Test";
+// import Test from "./components/Test";
 
 function App() {
     return (
         <>
-            {/* <CatDietCalculator /> */}
-            <Test />
+            <CatDietCalculator />
+            {/* <Test /> */}
         </>
     );
 }

@@ -193,7 +193,7 @@ const CatDietApp = () => {
         setWeight(parseFloat(newWeight));
 
         // 切換回圖表模式讓用戶看到結果
-        setWeightLog("log");
+        setWeightLog("show");
     };
     const fetchWeightData = async () => {
         // 如果沒有 URL，使用模擬數據展示效果
@@ -915,25 +915,25 @@ const CatDietApp = () => {
                     <div className="space-y-4 animate-fade-in">
                         <div className="flex gap-2">
                             <button
-                                onClick={() => setWeightLog("log")}
+                                onClick={() => setWeightLog("show")}
                                 className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold border flex items-center justify-center gap-1 ${
-                                    weightLog === "log"
+                                    weightLog === "show"
                                         ? "bg-orange-50 border-orange-200 text-orange-700"
                                         : "bg-gray-50 border-gray-100 text-gray-400"
                                 }`}>
                                 <Table size={14} /> 體重呈現
                             </button>
                             <button
-                                onClick={() => setWeightLog("show")}
+                                onClick={() => setWeightLog("log")}
                                 className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold border flex items-center justify-center gap-1 ${
-                                    weightLog === "show"
+                                    weightLog === "log"
                                         ? "bg-green-50 border-green-200 text-green-700"
                                         : "bg-gray-50 border-gray-100 text-gray-400"
                                 }`}>
                                 <Edit3 size={14} /> 體重記錄
                             </button>
                         </div>
-                        {weightLog === "log" ? (
+                        {weightLog === "show" ? (
                             <>
                                 <div className="bg-white rounded-xl shadow-sm p-3 border border-gray-100 flex gap-2 overflow-x-auto">
                                     <div className="flex items-center gap-2 min-w-fit px-2 border-r border-gray-100">

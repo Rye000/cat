@@ -33,10 +33,29 @@ const CatWeightRecorder = ({ onUploadSuccess }) => {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData((prev) => ({
-            ...prev,
-            [name]: value,
-        }));
+
+        // 特殊處理 weight 欄位
+        if (name === "weight") {
+            // 正則表達式驗證：
+            // ^      : 開頭
+            // \d* : 任意數量的數字
+            // \.?    : 最多一個小數點
+            // \d* : 任意數量的數字
+            // $      : 結尾
+            // 這個寫法會自動擋掉 負號(-)、e、以及任何非數字文字
+            if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                setFormData((prev) => ({
+                    ...prev,
+                    [name]: value,
+                }));
+            }
+        } else {
+            // 其他欄位 (如 date) 維持原本的邏輯
+            setFormData((prev) => ({
+                ...prev,
+                [name]: value,
+            }));
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -180,7 +199,7 @@ const CatWeightRecorder = ({ onUploadSuccess }) => {
                 <div style={{ marginBottom: "25px" }}>
                     <CustomTextField
                         label="體重"
-                        type="number"
+                        type="text" // 1. 改成 text，完全由我們控制輸入內容
                         name="weight"
                         value={formData.weight}
                         onChange={handleChange}
@@ -188,15 +207,17 @@ const CatWeightRecorder = ({ onUploadSuccess }) => {
                         required
                         fullWidth
                         variant="outlined"
-                        // 7. 體重這邊也改用 slotProps
+                        // 2. 加入這行：確保手機上會跳出帶有小數點的數字鍵盤
+                        inputMode="decimal"
                         slotProps={{
                             htmlInput: {
-                                step: "0.01",
-                                min: "0",
-                            }, // 對應舊的 inputProps
+                                // 3. 雖然是 text，但加上 pattern 可以幫助某些舊瀏覽器識別鍵盤類型
+                                pattern: "[0-9]*",
+                                // 注意：min/step 在 type="text" 下沒有驗證作用，主要靠 handleChange 過濾
+                            },
                             input: {
                                 endAdornment: <InputAdornment position="end">kg</InputAdornment>,
-                            }, // 對應舊的 InputProps (注意大小寫差異)
+                            },
                         }}
                     />
                 </div>
