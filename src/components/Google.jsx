@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react"; // 1. 多引入 useRef
+import React, { useState, useRef } from "react";
 import Swal from "sweetalert2";
 import TextField from "@mui/material/TextField";
 import InputAdornment from "@mui/material/InputAdornment";
@@ -19,30 +19,21 @@ const CustomTextField = styled(TextField)({
 });
 
 const CatWeightRecorder = ({ onUploadSuccess }) => {
-  const GAS_URL = import.meta.env.VITE_GOOGLE;
-
-  // 2. 建立一個 ref 來抓取日期輸入框的 DOM 元素
-  const dateInputRef = useRef(null);
-
+  // 1. 狀態管理
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
     weight: "",
   });
-
   const [loading, setLoading] = useState(false);
+
+  // 2. 建立一個 ref 來抓取日期輸入框的 DOM 元素
+  const dateInputRef = useRef(null);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
 
     // 特殊處理 weight 欄位
     if (name === "weight") {
-      // 正則表達式驗證：
-      // ^      : 開頭
-      // \d* : 任意數量的數字
-      // \.?    : 最多一個小數點
-      // \d* : 任意數量的數字
-      // $      : 結尾
-      // 這個寫法會自動擋掉 負號(-)、e、以及任何非數字文字
       if (value === "" || /^\d*\.?\d*$/.test(value)) {
         setFormData((prev) => ({
           ...prev,
@@ -50,7 +41,6 @@ const CatWeightRecorder = ({ onUploadSuccess }) => {
         }));
       }
     } else {
-      // 其他欄位 (如 date) 維持原本的邏輯
       setFormData((prev) => ({
         ...prev,
         [name]: value,
@@ -58,14 +48,34 @@ const CatWeightRecorder = ({ onUploadSuccess }) => {
     }
   };
 
+  /**
+   * 處理表單提交事件
+   * 1. 彈出 SweetAlert 視窗要求輸入驗證碼 (API Key)
+   * 2. 顯示上傳中的 Loading 狀態
+   * 3. 將資料 POST 到 Google Apps Script (GAS)
+   * 4. 根據 GAS 回傳的狀態顯示成功或失敗的提示
+   * 5. 若成功則清空體重欄位並觸發回呼函式
+   */
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // 決定使用哪個 GAS URL
+    const GAS_URL = import.meta.env.VITE_GOOGLE;
+
+    if (!GAS_URL) {
+        Swal.fire({
+            icon: "error",
+            title: "設定錯誤",
+            text: "找不到對應的 GAS URL 環境變數",
+        });
+        return;
+    }
+
     // 1. 第一步：先跳出 SweetAlert 讓你輸入驗證碼
-    const { value: userKey } = await Swal.fire({
+    const { value: userKey} = await Swal.fire({
       title: "身份驗證",
-      text: "請輸入通關密語才能上傳",
-      input: "password", // 使用 password 類型，輸入時會變成圓點點 (或是改用 'text' 也可以)
+      text: `準備上傳至資料庫`,
+      input: "password",
       inputLabel: "驗證 Key",
       inputPlaceholder: "請輸入 Key...",
       showCancelButton: true,
@@ -80,10 +90,8 @@ const CatWeightRecorder = ({ onUploadSuccess }) => {
       },
     });
 
-    // 如果使用者按了取消，userKey 會是 undefined，直接結束函式
     if (!userKey) return;
 
-    // 2. 使用者輸入了 Key，開始 loading 流程
     setLoading(true);
 
     Swal.fire({
@@ -96,10 +104,9 @@ const CatWeightRecorder = ({ onUploadSuccess }) => {
     });
 
     try {
-      // 建構 payload，把剛剛輸入的 userKey 放進去
       const payload = {
         ...formData,
-        apiKey: userKey, // 這裡使用手動輸入的值
+        apiKey: userKey,
       };
 
       const response = await fetch(GAS_URL, {
@@ -113,7 +120,7 @@ const CatWeightRecorder = ({ onUploadSuccess }) => {
         Swal.fire({
           icon: "success",
           title: "上傳成功！",
-          text: "已新增一筆紀錄",
+          text: `已新增紀錄`,
           timer: 1500,
           showConfirmButton: false,
           willClose: () => {
@@ -124,11 +131,10 @@ const CatWeightRecorder = ({ onUploadSuccess }) => {
           },
         });
       } else {
-        // 如果 GAS 回傳 error (通常是 Key 錯了)
         Swal.fire({
           icon: "error",
           title: "上傳失敗",
-          text: data.message, // 這裡會顯示 GAS 回傳的 "權限不足：驗證碼錯誤"
+          text: data.message,
         });
       }
     } catch (error) {
@@ -145,12 +151,10 @@ const CatWeightRecorder = ({ onUploadSuccess }) => {
 
   // 3. 專門處理點擊日期的函式
   const handleDateClick = () => {
-    // 如果瀏覽器支援 showPicker API (Chrome/Edge/Modern browsers)
     if (dateInputRef.current && dateInputRef.current.showPicker) {
       try {
         dateInputRef.current.showPicker();
       } catch (error) {
-        // 防止少數情況下報錯
         console.error(error);
       }
     }
@@ -183,17 +187,14 @@ const CatWeightRecorder = ({ onUploadSuccess }) => {
             required
             fullWidth
             variant="outlined"
-            // 4. 綁定 ref 到內部的 input 元素
             inputRef={dateInputRef}
-            // 5. 綁定 onClick 事件，點擊整個輸入框就觸發
             onClick={handleDateClick}
-            // 6. 使用新的 slotProps 取代舊屬性
             slotProps={{
               inputLabel: {
-                shrink: true, // 對應舊的 InputLabelProps={{ shrink: true }}
+                shrink: true,
               },
               htmlInput: {
-                style: { cursor: "pointer" }, // 讓滑鼠移過去變成手指形狀，暗示可點擊
+                style: { cursor: "pointer" },
               },
             }}
           />
@@ -210,10 +211,8 @@ const CatWeightRecorder = ({ onUploadSuccess }) => {
             required
             fullWidth
             variant="outlined"
-            // 移除這裡的 inputMode，移到底下
             slotProps={{
               htmlInput: {
-                // 1. 在這裡設定 inputMode，確保作用在 input 標籤上
                 inputMode: "decimal",
               },
               input: {

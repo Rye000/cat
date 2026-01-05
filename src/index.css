@@ -1,1 +1,10 @@
 @import "tailwindcss";
+
+@theme {
+  /* 自定義顏色範例：使用方法 className="text-brand-primary" */
+  --color-brand-primary: #3b82f6;
+  --color-brand-secondary: #10b981;
+
+  /* 自定義字型範例：使用方法 className="font-display" */
+  /* --font-display: "Comic Sans MS", cursive; */
+}

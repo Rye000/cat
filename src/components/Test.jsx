@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
     Cat,
     Activity,
@@ -19,11 +19,13 @@ import {
 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import CatWeightRecorder from "./Google";
+import api from "../api/axios";
 import Swal from "sweetalert2";
 import FormControl from "@mui/material/FormControl";
 import InputLabel from "@mui/material/InputLabel";
 import Select from "@mui/material/Select";
 import MenuItem from "@mui/material/MenuItem";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import { styled } from "@mui/material/styles"; // 如果你想用自訂顏色的話
 // 自訂綠色外框的 FormControl (包在 Select 外面)
 const CustomFormControl = styled(FormControl)({
@@ -73,6 +75,7 @@ const FACTOR_DATA = [
     },
 ];
 
+// 預設的貓罐罐資料庫，包含名稱與熱量 (kcal) 資訊
 const CAN_DATABASE = [
     { id: "none", name: "不吃這個罐罐", kcal: 0 },
     { id: "petline_tuna", name: "PETLINE 懷石 吞拿魚慕絲", kcal: 48.0 },
@@ -82,6 +85,7 @@ const CAN_DATABASE = [
     { id: "asikatta_goat", name: "Asikatta 山羊奶吞拿魚", kcal: 67.92 },
 ];
 
+// 食物分類配置，定義了主食、副食等類別及其對應的 UI 顏色
 const FOOD_CATEGORIES = [
     {
         id: "staple",
@@ -139,6 +143,7 @@ const simpleCsvParser = (csvText) => {
     return result;
 };
 
+// === 主要應用程式組件：貓咪飲食與體重管理系統 ===
 const CatDietApp = () => {
     // === 全域狀態 ===
     const [activeTab, setActiveTab] = useState("daily");
@@ -173,11 +178,15 @@ const CatDietApp = () => {
     const SNACK_KCAL_PER_G = 4.0;
 
     // === API 設定 ===
-    // 請在此填入您的 Google Sheet CSV 發布連結
-    // 如果是本地開發可以使用 process.env 或 import.meta.env，但在這裡我們使用變數
-    const CSV_API_URL = import.meta.env.VITE_API_KEY;
 
-    const handleLocalUpdate = (newDate, newWeight) => {
+    // 狀態：目前選擇的貓咪 (預設 cat1)
+    const [currentCat, setCurrentCat] = useState("cat1");
+
+    // 手動更新本地圖表資料，讓使用者能立即看到新增的體重紀錄
+    const handleLocalUpdate = (newDate, newWeight, cat = "cat1") => {
+        // 只有當更新的貓咪跟目前顯示的貓咪一樣時，才更新圖表
+        if (cat !== currentCat) return;
+
         // 手動把新資料加進去，不用等 CSV
         const newRecord = {
             fullDate: newDate, // 確保格式正確 YYYY-MM-DD
@@ -195,39 +204,9 @@ const CatDietApp = () => {
         // 切換回圖表模式讓用戶看到結果
         setWeightLog("show");
     };
-    const fetchWeightData = async () => {
-        // 如果沒有 URL，使用模擬數據展示效果
-        if (!CSV_API_URL) {
-            // console.warn("未設定 CSV_API_URL，使用模擬數據");
-            const mockCsvData = `date,weight
-2025-01-01,1
-2025-01-12,2
-2025-02-02,3
-2025-02-10,4
-2025-02-14,5
-2025-02-15,6`;
-            processCsvData(mockCsvData);
-            return;
-        }
-
-        setIsLoadingWeight(true);
-        try {
-            // 小技巧：在 URL 後面加上時間戳記，避免瀏覽器快取舊的 CSV
-            const response = await fetch(`${CSV_API_URL}&t=${Date.now()}`);
-            const reader = response.body.getReader();
-            const result = await reader.read();
-            const decoder = new TextDecoder("utf-8");
-            const csvText = decoder.decode(result.value);
-            processCsvData(csvText); // processCsvData 需要定義在組件內或用 useCallback
-        } catch (error) {
-            console.error("Failed to fetch weight data", error);
-        } finally {
-            setIsLoadingWeight(false);
-        }
-    };
 
     // 處理 CSV 數據的共用邏輯
-    const processCsvData = (csvText) => {
+    const processCsvData = useCallback((csvText) => {
         const rawData = simpleCsvParser(csvText);
 
         // 資料清洗與轉換
@@ -280,11 +259,43 @@ const CatDietApp = () => {
         }
 
         setIsLoadingWeight(false);
-    };
+    }, []);
+
+    // 從 API 獲取貓咪體重數據
+    const fetchWeightData = useCallback(async (cat = currentCat) => {
+        const CSV_API_URL = cat === "cat1" ? import.meta.env.VITE_API_KEY : import.meta.env.VITE_API_KEY2;
+
+        // 如果沒有 URL，使用模擬數據展示效果
+        if (!CSV_API_URL) {
+            // console.warn("未設定 CSV_API_URL，使用模擬數據");
+            const mockCsvData = `date,weight
+2025-01-01,1
+2025-01-12,2
+2025-02-02,3
+2025-02-10,4
+2025-02-14,5
+2025-02-15,6`;
+            processCsvData(mockCsvData);
+            return;
+        }
+
+        setIsLoadingWeight(true);
+        try {
+            // 小技巧：在 URL 後面加上時間戳記，避免瀏覽器快取舊的 CSV
+            const response = await api.get(`${CSV_API_URL}&t=${Date.now()}`);
+            processCsvData(response.data); // processCsvData 需要定義在組件內或用 useCallback
+        } catch (error) {
+            console.error("Failed to fetch weight data", error);
+            setWeightHistory([]); // 錯誤時清空
+        } finally {
+            setIsLoadingWeight(false);
+        }
+    }, [currentCat, processCsvData]);
+
     // === Effect: 取得體重數據 ===
     useEffect(() => {
-        fetchWeightData();
-    }, []); // 依賴陣列為空，只在掛載時執行一次
+        fetchWeightData(currentCat);
+    }, [fetchWeightData, currentCat]); // 當貓咪切換時重新抓取
 
     // === Effect: 當因子類別改變時重置係數 ===
     useEffect(() => {
@@ -314,7 +325,7 @@ const CatDietApp = () => {
     const rer = 70 * Math.pow(weight, 0.75);
     const der = rer * specificFactor;
 
-    const calculateDiet = () => {
+    const results = useMemo(() => {
         const can1 = CAN_DATABASE.find((c) => c.id === can1Id) || CAN_DATABASE[0];
         const can2 = CAN_DATABASE.find((c) => c.id === can2Id) || CAN_DATABASE[0];
         const basicCanKcal = can1.kcal + can2.kcal;
@@ -379,9 +390,7 @@ const CatDietApp = () => {
                 other: customOtherKcal,
             },
         };
-    };
-
-    const results = calculateDiet();
+    }, [can1Id, can2Id, snackGrams, customFoods, calcMode, targetKcal, manualZiwiGrams]);
 
     // === 處理函數 ===
     const handleAddCustomFood = () => {
@@ -403,6 +412,7 @@ const CatDietApp = () => {
         setCustomFoods(customFoods.filter((item) => item.id !== id));
     };
 
+    // 將計算出的每日能量需求 (DER) 應用為當前的目標熱量
     const applyDerToTarget = () => {
         setTargetKcal(Math.round(der));
         setActiveTab("daily");
@@ -913,6 +923,7 @@ const CatDietApp = () => {
                 {/* === 分頁 3: 體重趨勢圖 (整合真實數據與篩選) === */}
                 {activeTab === "weight" && (
                     <div className="space-y-4 animate-fade-in">
+                        {/* 功能切換按鈕 (體重呈現 / 體重紀錄) */}
                         <div className="flex gap-2">
                             <button
                                 onClick={() => setWeightLog("show")}
@@ -933,8 +944,31 @@ const CatDietApp = () => {
                                 <Edit3 size={14} /> 體重記錄
                             </button>
                         </div>
+
                         {weightLog === "show" ? (
                             <>
+                                {/* 貓咪選擇器 (僅在體重呈現時顯示) */}
+                                <div className="bg-white rounded-xl shadow-sm p-1 border border-gray-100 flex">
+                                    <button
+                                        onClick={() => setCurrentCat("cat1")}
+                                        className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                                            currentCat === "cat1"
+                                                ? "bg-purple-100 text-purple-700 shadow-sm"
+                                                : "text-gray-400 hover:bg-gray-50"
+                                        }`}>
+                                        <Cat size={16} /> 莎
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentCat("cat2")}
+                                        className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                                            currentCat === "cat2"
+                                                ? "bg-purple-100 text-purple-700 shadow-sm"
+                                                : "text-gray-400 hover:bg-gray-50"
+                                        }`}>
+                                        <Cat size={16} /> 弟
+                                    </button>
+                                </div>
+
                                 <div className="bg-white rounded-xl shadow-sm p-3 border border-gray-100 flex gap-2 overflow-x-auto">
                                     <div className="flex items-center gap-2 min-w-fit px-2 border-r border-gray-100">
                                         <Filter size={16} className="text-gray-400" />
@@ -1057,7 +1091,7 @@ const CatDietApp = () => {
                             </>
                         ) : (
                             // 當上傳成功時呼叫 fetchWeightData
-                            <CatWeightRecorder onUploadSuccess={handleLocalUpdate} />
+                            <CatWeightRecorder defaultCat={currentCat} onUploadSuccess={handleLocalUpdate} />
                         )}
                     </div>
                 )}
