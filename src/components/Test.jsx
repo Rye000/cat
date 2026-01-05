@@ -263,7 +263,7 @@ const CatDietApp = () => {
 
     // 從 API 獲取貓咪體重數據
     const fetchWeightData = useCallback(async (cat = currentCat) => {
-        const CSV_API_URL = cat === "cat1" ? import.meta.env.VITE_API_KEY : import.meta.env.VITE_API_KEY2;
+        const CSV_API_URL = cat === "cat1" ? import.meta.env.VITE_API_KEY : import.meta.env.VITE_API_KEY_2;
 
         // 如果沒有 URL，使用模擬數據展示效果
         if (!CSV_API_URL) {
