@@ -76,6 +76,10 @@ const CatWeightRecorder = ({ onUploadSuccess }) => {
       title: "身份驗證",
       text: `準備上傳至資料庫`,
       input: "password",
+      inputAttributes: {
+        autocomplete: "one-time-code",
+        name: "verification_key_field"
+      },
       inputLabel: "驗證 Key",
       inputPlaceholder: "請輸入 Key...",
       showCancelButton: true,
