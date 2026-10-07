@@ -117,6 +117,16 @@ const FOOD_CATEGORIES = [
     },
 ];
 
+// 時間範圍篩選選項
+const TIME_RANGE_OPTIONS = [
+    { id: "all", label: "全部" },
+    { id: "1m", label: "近 1 個月" },
+    { id: "3m", label: "近 3 個月" },
+    { id: "6m", label: "近 6 個月" },
+    { id: "1y", label: "近 1 年" },
+    { id: "custom", label: "自訂年月" },
+];
+
 // 簡易 CSV 解析器 (替代 papaparse 以避免依賴錯誤)
 const simpleCsvParser = (csvText) => {
     const lines = csvText.trim().split("\n");
@@ -170,6 +180,7 @@ const CatDietApp = () => {
     const [isLoadingWeight, setIsLoadingWeight] = useState(false);
     const [weightLog, setWeightLog] = useState("show");
     // 篩選器狀態
+    const [timeRange, setTimeRange] = useState("all");
     const [filterYear, setFilterYear] = useState("all");
     const [filterMonth, setFilterMonth] = useState("all");
 
@@ -310,12 +321,46 @@ const CatDietApp = () => {
 
     // === 計算邏輯：篩選後的體重數據 ===
     const filteredWeightData = useMemo(() => {
+        if (!weightHistory || weightHistory.length === 0) return [];
+
+        // 1. 自訂年月模式
+        if (timeRange === "custom") {
+            return weightHistory.filter((item) => {
+                const yearMatch = filterYear === "all" || item.year.toString() === filterYear;
+                const monthMatch = filterMonth === "all" || item.month.toString() === filterMonth;
+                return yearMatch && monthMatch;
+            });
+        }
+
+        // 2. 全部歷史模式
+        if (timeRange === "all") {
+            return weightHistory;
+        }
+
+        // 3. 相對時間區間模式 (近1個月 / 近3個月 / 近6個月 / 近1年)
+        const latestRecordDate = new Date(weightHistory[weightHistory.length - 1].fullDate);
+        const now = new Date();
+        const daysDiff = (now.getTime() - latestRecordDate.getTime()) / (1000 * 60 * 60 * 24);
+
+        // 基準日推算：若最新記錄距離今天超過 90 天（表示檢視的是過往歷史備份或測試模擬資料），
+        // 則以最新記錄日期為基準；若是平常持續有在記錄（最新資料落在近期），則以今日 (now) 為基準。
+        const baseDate = daysDiff > 90 ? latestRecordDate : (latestRecordDate > now ? latestRecordDate : now);
+
+        const rangeDaysMap = {
+            "1m": 30,
+            "3m": 90,
+            "6m": 180,
+            "1y": 365,
+        };
+        const maxDays = rangeDaysMap[timeRange] || 90;
+        const startTime = baseDate.getTime() - maxDays * 24 * 60 * 60 * 1000;
+
         return weightHistory.filter((item) => {
-            const yearMatch = filterYear === "all" || item.year.toString() === filterYear;
-            const monthMatch = filterMonth === "all" || item.month.toString() === filterMonth;
-            return yearMatch && monthMatch;
+            const itemTime = new Date(item.fullDate).getTime();
+            // 包含基準日當天（加 1 天作為結束緩衝）
+            return itemTime >= startTime && itemTime <= baseDate.getTime() + 24 * 60 * 60 * 1000;
         });
-    }, [weightHistory, filterYear, filterMonth]);
+    }, [weightHistory, timeRange, filterYear, filterMonth]);
 
     // 取得所有可用的年份 (用於下拉選單)
     const availableYears = useMemo(() => {
@@ -972,37 +1017,68 @@ const CatDietApp = () => {
                                     </button>
                                 </div>
 
-                                <div className="bg-white rounded-xl shadow-sm p-3 border border-gray-100 flex gap-2 overflow-x-auto">
-                                    <div className="flex items-center gap-2 min-w-fit px-2 border-r border-gray-100">
-                                        <Filter size={16} className="text-gray-400" />
-                                        <span className="text-xs font-bold text-gray-600">篩選</span>
+                                <div className="bg-white rounded-xl shadow-sm p-3 border border-gray-100 space-y-2.5">
+                                    {/* 快捷時間範圍切換按鈕 */}
+                                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                                        <div className="flex items-center gap-1 min-w-fit pr-2 text-xs font-bold text-gray-500 border-r border-gray-200">
+                                            <Filter size={14} className="text-purple-500" />
+                                            <span>區間</span>
+                                        </div>
+                                        {TIME_RANGE_OPTIONS.map((opt) => (
+                                            <button
+                                                key={opt.id}
+                                                type="button"
+                                                onClick={() => setTimeRange(opt.id)}
+                                                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                                                    timeRange === opt.id
+                                                        ? "bg-purple-600 text-white shadow-xs"
+                                                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                                }`}>
+                                                {opt.label}
+                                            </button>
+                                        ))}
                                     </div>
 
-                                    {/* 年份選擇 */}
-                                    <select
-                                        value={filterYear}
-                                        onChange={(e) => setFilterYear(e.target.value)}
-                                        className="flex-1 bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg p-2 focus:outline-none focus:border-purple-300">
-                                        <option value="all">所有年份</option>
-                                        {availableYears.map((year) => (
-                                            <option key={year} value={year}>
-                                                {year} 年
-                                            </option>
-                                        ))}
-                                    </select>
+                                    {/* 僅在選擇「自訂年月」時顯示年份與月份下拉選單 */}
+                                    {timeRange === "custom" && (
+                                        <div className="flex gap-2 pt-1 border-t border-dashed border-gray-100">
+                                            <select
+                                                value={filterYear}
+                                                onChange={(e) => setFilterYear(e.target.value)}
+                                                className="flex-1 bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg p-2 focus:outline-none focus:border-purple-300">
+                                                <option value="all">所有年份</option>
+                                                {availableYears.map((year) => (
+                                                    <option key={year} value={year}>
+                                                        {year} 年
+                                                    </option>
+                                                ))}
+                                            </select>
 
-                                    {/* 月份選擇 */}
-                                    <select
-                                        value={filterMonth}
-                                        onChange={(e) => setFilterMonth(e.target.value)}
-                                        className="flex-1 bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg p-2 focus:outline-none focus:border-purple-300">
-                                        <option value="all">所有月份</option>
-                                        {[...Array(12)].map((_, i) => (
-                                            <option key={i + 1} value={i + 1}>
-                                                {i + 1} 月
-                                            </option>
-                                        ))}
-                                    </select>
+                                            <select
+                                                value={filterMonth}
+                                                onChange={(e) => setFilterMonth(e.target.value)}
+                                                className="flex-1 bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg p-2 focus:outline-none focus:border-purple-300">
+                                                <option value="all">所有月份</option>
+                                                {[...Array(12)].map((_, i) => (
+                                                    <option key={i + 1} value={i + 1}>
+                                                        {i + 1} 月
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+
+                                    {/* 篩選狀態摘要提示 */}
+                                    <div className="flex justify-between items-center text-[11px] text-gray-400 px-1 pt-0.5">
+                                        <span>
+                                            {timeRange === "custom"
+                                                ? `自訂：${filterYear === "all" ? "全年" : `${filterYear}年`} ${filterMonth === "all" ? "全部月份" : `${filterMonth}月`}`
+                                                : `目前範圍：${TIME_RANGE_OPTIONS.find((o) => o.id === timeRange)?.label || "全部"}`}
+                                        </span>
+                                        <span className="font-semibold text-purple-600">
+                                            {filteredWeightData.length} 筆記錄
+                                        </span>
+                                    </div>
                                 </div>
 
                                 <div className="bg-white rounded-xl shadow-sm p-4 border border-purple-100">
@@ -1064,6 +1140,14 @@ const CatDietApp = () => {
                                             <div className="h-full w-full flex flex-col items-center justify-center text-gray-300 gap-2">
                                                 <Calendar size={32} />
                                                 <span className="text-xs">此期間無數據</span>
+                                                {timeRange !== "all" && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setTimeRange("all")}
+                                                        className="text-xs text-purple-600 font-bold hover:underline">
+                                                        查看全部數據
+                                                    </button>
+                                                )}
                                             </div>
                                         )}
                                     </div>
